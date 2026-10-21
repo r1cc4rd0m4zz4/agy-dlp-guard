@@ -1,0 +1,11 @@
+{
+  "name": "agy-dlp-guard",
+  "displayName": "Antigravity DLP Guard",
+  "version": "0.1.0",
+  "description": "Zero-dependency Data Loss Prevention (DLP), path protection, anti-tampering, and secret redaction guard for Antigravity.",
+  "suggestedPrompts": [
+    "Verifica lo stato corrente di DLP Guard e i percorsi protetti",
+    "Scansiona un comando o un percorso con DLP Guard per verificare se è sicuro",
+    "Mostra le regole di sicurezza DLP attive nella sessione"
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "name": "agy-dlp-guard",
+  "version": "0.1.0",
+  "description": "Zero-dependency DLP, Path Protection & Secret Redaction Hook & Plugin for Google Antigravity (AGY)",
+  "type": "module",
+  "bin": {
+    "agy-dlp": "./bin/agy-dlp.mjs",
+    "agy-dlp-guard": "./bin/agy-dlp.mjs"
+  },
+  "scripts": {
+    "test": "node tests/run_all.mjs",
+    "status": "node bin/agy-dlp.mjs status",
+    "install-global": "node bin/agy-dlp.mjs install --global",
+    "install-workspace": "node bin/agy-dlp.mjs install --workspace",
+    "uninstall-global": "node bin/agy-dlp.mjs uninstall --global",
+    "uninstall-workspace": "node bin/agy-dlp.mjs uninstall --workspace"
+  },
+  "keywords": [
+    "antigravity",
+    "agy",
+    "antigravity-hook",
+    "antigravity-plugin",
+    "antigravity-cli",
+    "dlp",
+    "data-loss-prevention",
+    "security",
+    "secret-detection",
+    "redaction",
+    "guardrails",
+    "zero-trust",
+    "ai-agents",
+    "developer-tools",
+    "gitleaks",
+    "path-protection"
+  ],
+  "author": "r1cc4rd0m4zz4",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/r1cc4rd0m4zz4/agy-dlp-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/r1cc4rd0m4zz4/agy-dlp-guard/issues"
+  },
+  "homepage": "https://github.com/r1cc4rd0m4zz4/agy-dlp-guard#readme",
+  "files": [
+    "plugin.json",
+    "hooks.json",
+    "bin/agy-dlp.mjs",
+    "hooks/dlp-guard.mjs",
+    "hooks/dlp-session-start.mjs",
+    "hooks/hooks.json",
+    "lib/bash-guard.mjs",
+    "lib/config.mjs",
+    "lib/path-guard.mjs",
+    "lib/secret-scanner.mjs",
+    "rules/AGENTS.md",
+    "skills/dlp-guard/SKILL.md",
+    "dlp-guard.json.example",
+    "README.md",
+    "LICENSE"
+  ]
+}

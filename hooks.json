@@ -1,0 +1,23 @@
+{
+  "dlp-guard": {
+    "enabled": true,
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node ./hooks/dlp-session-start.mjs"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./hooks/dlp-guard.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
