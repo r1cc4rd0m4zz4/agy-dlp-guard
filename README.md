@@ -60,7 +60,35 @@ Prevents a compromised or jailbroken agent from disabling or tampering with DLP 
 
 ## 🚀 Installation
 
-### Option A: Install as a Standalone Antigravity Hook (Recommended)
+### Option A: Install via Antigravity CLI directly from GitHub (Recommended)
+
+You can install `agy-dlp-guard` directly into Antigravity (`agy`) straight from the GitHub repository URL in one command:
+
+```bash
+# Install plugin directly from GitHub into ~/.gemini/config/plugins/
+agy plugin install https://github.com/r1cc4rd0m4zz4/agy-dlp-guard
+```
+
+Antigravity will automatically clone the repository, register the plugin manifest (`plugin.json`), mount the DLP lifecycle hooks (`PreToolUse`, `SessionStart`), and activate the bundled `dlp-guard` skill and `rules/AGENTS.md`.
+
+Manage the plugin at any time:
+```bash
+# Check status and components
+agy plugin list
+
+# Temporarily disable / re-enable
+agy plugin disable agy-dlp-guard
+agy plugin enable agy-dlp-guard
+
+# Uninstall
+agy plugin uninstall agy-dlp-guard
+```
+
+---
+
+### Option B: Install as a Standalone Hook via CLI (`agy-dlp`)
+
+If you prefer to clone the repository manually or install it into a specific workspace without using `agy plugin install`:
 
 ```bash
 git clone https://github.com/r1cc4rd0m4zz4/agy-dlp-guard.git
@@ -70,13 +98,24 @@ cd agy-dlp-guard
 node bin/agy-dlp.mjs install --global
 
 # Or install per-workspace into .agents/hooks.json
-node bin/agy-dlp.mjs install --project
+node bin/agy-dlp.mjs install --workspace
 ```
 
-### Option B: Validate & Use as an Antigravity Plugin
+---
 
-`agy-dlp-guard` conforms strictly to the Antigravity Plugin specification (`plugin.json`, `hooks/hooks.json`, `rules/AGENTS.md`, `skills/dlp-guard/SKILL.md`):
+### Option C: Manual Workspace / Global Plugin Directory
 
+You can also clone the repository directly into any standard Antigravity plugin directory:
+
+```bash
+# Global plugin (~/.gemini/config/plugins/)
+git clone https://github.com/r1cc4rd0m4zz4/agy-dlp-guard.git ~/.gemini/config/plugins/agy-dlp-guard
+
+# Workspace-specific plugin (.agents/plugins/)
+git clone https://github.com/r1cc4rd0m4zz4/agy-dlp-guard.git .agents/plugins/agy-dlp-guard
+```
+
+Verify compliance at any time:
 ```bash
 agy plugin validate . --strict
 ```

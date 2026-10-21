@@ -267,7 +267,7 @@ function cmdTest() {
 function main() {
   const args = process.argv.slice(2);
   const cmd = args[0] || "status";
-  const isWorkspace = args.includes("--workspace");
+  const isWorkspace = args.includes("--workspace") || args.includes("--project");
 
   switch (cmd) {
     case "status":
