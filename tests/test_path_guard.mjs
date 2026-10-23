@@ -32,6 +32,7 @@ export async function runPathGuardTests() {
     assert.ok(prot(".env.example"), "Symlink named .env.example pointing to .env must be blocked");
     fs.unlinkSync(fakeTemplate);
     assert.ok(prot("~/.gemini/config/.env.example", "write"), "Writing .env.example inside integrityPath must be blocked");
+    assert.ok(prot("~/.ssh/.env.example", "read"), "Reading .env.example inside protected directory ~/.ssh must be blocked");
 
     // 3. Credentials, keys, cloud/infra state, and shell rc files
     for (const p of [

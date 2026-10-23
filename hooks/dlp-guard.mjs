@@ -13,6 +13,7 @@
  */
 
 import * as fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { loadConfig } from "../lib/config.mjs";
 import { isPathProtected } from "../lib/path-guard.mjs";
 import { checkBashCommand } from "../lib/bash-guard.mjs";
@@ -65,20 +66,49 @@ export function findPaths(args) {
     "paths",
     "Files",
     "files",
+    "uri",
+    "Uri",
+    "URI",
   ];
+
+  const normalizeRawPath = (raw) => {
+    const s = raw.trim();
+    if (!s) return "";
+    if (s.startsWith("file://")) {
+      try {
+        return fileURLToPath(s);
+      } catch {
+        return s.slice(7);
+      }
+    }
+    return s.includes("://") ? "" : s;
+  };
 
   const found = [];
   for (const k of PATH_KEYS) {
     if (args[k] !== undefined && args[k] !== null) {
       if (Array.isArray(args[k])) {
         for (const item of args[k]) {
-          if (typeof item === "string" && item.trim()) found.push(item.trim());
+          if (typeof item === "string") {
+            const p = normalizeRawPath(item);
+            if (p) found.push(p);
+          }
         }
-      } else if (typeof args[k] === "string" && args[k].trim()) {
-        found.push(args[k].trim());
+      } else if (typeof args[k] === "string") {
+        const p = normalizeRawPath(args[k]);
+        if (p) found.push(p);
       }
     }
   }
+
+  const patch = args.patchText || args.patch || "";
+  if (typeof patch === "string" && patch) {
+    for (const m of patch.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$|^\*\*\* Move to: (.+)$|^(?:\+\+\+|---) (?:[ab]\/)?(.+)$/gm)) {
+      const t = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+      if (t && t !== "/dev/null") found.push(t);
+    }
+  }
+
   return found;
 }
 
@@ -224,14 +254,17 @@ function main() {
     }
   }
 
-  // 5. Outbound exfiltration guard on web search / URL fetch tools
+  // 5. Outbound exfiltration guard on web search, URL fetch, send_message, and MCP tools
   if (
     toolName === "search_web" ||
     toolName === "read_url_content" ||
+    toolName === "send_message" ||
+    toolName.startsWith("mcp:") ||
+    toolName.startsWith("mcp_") ||
     toolName.includes("fetch") ||
     toolName.includes("http")
   ) {
-    const outboundText = [args.query, args.Query, args.url, args.Url, args.URL]
+    const outboundText = [args.query, args.Query, args.url, args.Url, args.URL, args.Message, args.message, args.prompt, args.Prompt, args.body, args.Body]
       .filter((v) => typeof v === "string" && v)
       .join(" ");
     if (outboundText) {

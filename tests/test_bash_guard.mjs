@@ -169,6 +169,12 @@ export async function runBashGuardTests() {
       "agy-dlp-guard toggle off",
       "node /path/to/bin/agy-dlp.mjs toggle off",
       "./bin/agy-dlp.mjs uninstall --global",
+      "agy plugin disable agy-dlp-guard",
+      "pi uninstall pi-dlp-guard",
+      "opencode plugin remove opencode-dlp-guard",
+      "rm$IFS.env",
+      "git checkout -- .env",
+      "git restore .env",
     ]) {
       assert.ok(blocked(c), `Expected self-disabling command to be blocked: ${c}`);
     }

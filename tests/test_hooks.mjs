@@ -10,11 +10,12 @@ const packageDir = path.resolve(testDir, "..");
 const guardScript = path.join(packageDir, "hooks", "dlp-guard.mjs");
 const sessionScript = path.join(packageDir, "hooks", "dlp-session-start.mjs");
 
-function runHook(scriptPath, inputObj) {
+function runHook(scriptPath, inputObj, customHome) {
   const res = cp.spawnSync("node", [scriptPath], {
     input: JSON.stringify(inputObj),
     encoding: "utf-8",
     timeout: 3000,
+    env: customHome ? { ...process.env, HOME: customHome } : process.env,
   });
   assert.equal(res.status, 0, `Hook failed with error: ${res.stderr}`);
   return JSON.parse(res.stdout || "{}");
@@ -22,10 +23,12 @@ function runHook(scriptPath, inputObj) {
 
 export async function runHookProtocolTests() {
   const cleanProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), "clean-proj-"));
+  const cleanHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "clean-home-"));
+  const invoke = (script, payload) => runHook(script, payload, cleanHomeDir);
 
   try {
     // 1. SessionStart protocol
-    const sessionOut = runHook(sessionScript, {
+    const sessionOut = invoke(sessionScript, {
       conversationId: "test-conv-001",
       workspacePaths: [cleanProjectDir],
       modelName: "test-model",
@@ -39,7 +42,7 @@ export async function runHookProtocolTests() {
     );
 
     // 2. PreToolUse: run_command blocking malicious command
-    const cmdDeny = runHook(guardScript, {
+    const cmdDeny = invoke(guardScript, {
       toolCall: {
         name: "run_command",
         args: { CommandLine: "echo test > .env" },
@@ -50,7 +53,7 @@ export async function runHookProtocolTests() {
     assert.match(cmdDeny.reason || "", /DLP Guard/);
 
     // 3. PreToolUse: run_command allowing benign command
-    const cmdAllow = runHook(guardScript, {
+    const cmdAllow = invoke(guardScript, {
       toolCall: {
         name: "run_command",
         args: { CommandLine: "git status" },
@@ -60,7 +63,7 @@ export async function runHookProtocolTests() {
     assert.equal(cmdAllow.decision, "allow", "git status must be allowed");
 
     // 4. PreToolUse: read_file blocking protected path
-    const readDeny = runHook(guardScript, {
+    const readDeny = invoke(guardScript, {
       toolCall: {
         name: "read_file",
         args: { Path: ".env" },
@@ -70,7 +73,7 @@ export async function runHookProtocolTests() {
     assert.equal(readDeny.decision, "deny", "read_file on .env must be denied");
 
     // 5. PreToolUse: read_file allowing benign path
-    const readAllow = runHook(guardScript, {
+    const readAllow = invoke(guardScript, {
       toolCall: {
         name: "read_file",
         args: { Path: "package.json" },
@@ -80,7 +83,7 @@ export async function runHookProtocolTests() {
     assert.equal(readAllow.decision, "allow", "read_file on package.json must be allowed");
 
     // 6. PreToolUse: write_file blocking integrity path (guard's own package)
-    const writeIntegrityDeny = runHook(guardScript, {
+    const writeIntegrityDeny = invoke(guardScript, {
       toolCall: {
         name: "write_file",
         args: {
@@ -94,7 +97,7 @@ export async function runHookProtocolTests() {
 
     // 7. PreToolUse: write_file blocking plaintext secret
     const sampleToken = ["gh" + "p_", "1234567890".repeat(3), "123456"].join("");
-    const writeSecretDeny = runHook(guardScript, {
+    const writeSecretDeny = invoke(guardScript, {
       toolCall: {
         name: "write_file",
         args: {
@@ -107,7 +110,7 @@ export async function runHookProtocolTests() {
     assert.equal(writeSecretDeny.decision, "deny", "write_file containing secret must be denied");
 
     // 8. PreToolUse: edit_file blocking secret replacement
-    const editSecretDeny = runHook(guardScript, {
+    const editSecretDeny = invoke(guardScript, {
       toolCall: {
         name: "edit_file",
         args: {
@@ -121,7 +124,7 @@ export async function runHookProtocolTests() {
     assert.equal(editSecretDeny.decision, "deny", "edit_file with secret replacement must be denied");
 
     // 9. Regression test: edit_file where Target (old text snippet) is literally ".env" on a benign file (README.md) must be ALLOWED
-    const editTargetSnippetAllow = runHook(guardScript, {
+    const editTargetSnippetAllow = invoke(guardScript, {
       toolCall: {
         name: "edit_file",
         args: {
@@ -139,7 +142,7 @@ export async function runHookProtocolTests() {
     );
 
     // 10. PreToolUse: multi_replace_file_content blocking secret in ReplacementChunks
-    const multiReplaceDeny = runHook(guardScript, {
+    const multiReplaceDeny = invoke(guardScript, {
       toolCall: {
         name: "multi_replace_file_content",
         args: {
@@ -158,7 +161,7 @@ export async function runHookProtocolTests() {
     );
 
     // 11. PreToolUse: search_web exfiltration guard blocking secret in query
-    const searchWebExfilDeny = runHook(guardScript, {
+    const searchWebExfilDeny = invoke(guardScript, {
       toolCall: {
         name: "search_web",
         args: {
@@ -174,7 +177,7 @@ export async function runHookProtocolTests() {
     );
 
     // 12. PreToolUse: clean write allowed in an ordinary project directory
-    const cleanWrite = runHook(guardScript, {
+    const cleanWrite = invoke(guardScript, {
       toolCall: {
         name: "write_file",
         args: { Path: "src/utils.js", Content: "export function add(a, b) { return a + b; }" },
@@ -187,5 +190,6 @@ export async function runHookProtocolTests() {
     return true;
   } finally {
     fs.rmSync(cleanProjectDir, { recursive: true, force: true });
+    fs.rmSync(cleanHomeDir, { recursive: true, force: true });
   }
 }

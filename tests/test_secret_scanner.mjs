@@ -78,10 +78,11 @@ export async function runSecretScannerTests() {
   assert.equal(out.match(/\[REDACTED_AWS_KEY_#1\]/g)?.length, 2, "Same secret must share token #1");
   assert.equal(out.match(/\[REDACTED_AWS_KEY_#2\]/g)?.length, 1, "Different secret must get token #2");
 
-  // 4. Idempotency
+  // 4. Idempotency & Session Memory
   resetSessionState();
   const once = redactSecrets("API" + "_KEY=hunter2hunter2 and " + AWS_VAL, DEFAULT_CONFIG);
   assert.equal(redactSecrets(once, DEFAULT_CONFIG), once, "Redaction must be idempotent");
+  assert.equal(redactSecrets('print("hunter2hunter2")', DEFAULT_CONFIG), 'print("[REDACTED_SECRET_#1]")', "Session memory must redact known secret");
 
   // 5. No false positives on benign code and identifiers
   resetSessionState();
