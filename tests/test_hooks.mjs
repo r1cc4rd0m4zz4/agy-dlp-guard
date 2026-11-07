@@ -123,6 +123,34 @@ export async function runHookProtocolTests() {
     });
     assert.equal(editSecretDeny.decision, "deny", "edit_file with secret replacement must be denied");
 
+    // 8b. PreToolUse: edit_file with newString containing a secret token
+    const editNewStringDeny = invoke(guardScript, {
+      toolCall: {
+        name: "edit_file",
+        args: {
+          Path: "src/config.js",
+          newString: 'const tok = "' + sampleToken + '";',
+        },
+      },
+      workspacePaths: [cleanProjectDir],
+    });
+    assert.equal(editNewStringDeny.decision, "deny", "edit_file with secret in newString must be denied");
+
+    // 8c. PreToolUse: edit_file with edits array containing newString
+    const editEditsArrayDeny = invoke(guardScript, {
+      toolCall: {
+        name: "edit_file",
+        args: {
+          Path: "src/config.js",
+          edits: [
+            { oldText: "const x = 1;", newString: 'const tok = "' + sampleToken + '";' },
+          ],
+        },
+      },
+      workspacePaths: [cleanProjectDir],
+    });
+    assert.equal(editEditsArrayDeny.decision, "deny", "edit_file with secret in edits array must be denied");
+
     // 9. Regression test: edit_file where Target (old text snippet) is literally ".env" on a benign file (README.md) must be ALLOWED
     const editTargetSnippetAllow = invoke(guardScript, {
       toolCall: {
@@ -186,7 +214,7 @@ export async function runHookProtocolTests() {
     });
     assert.equal(cleanWrite.decision, "allow", "Clean write in project directory must be allowed");
 
-    console.log("  ok   hooks protocol (all 12 assertion groups passed)");
+    console.log("  ok   hooks protocol (all 14 assertion groups passed)");
     return true;
   } finally {
     fs.rmSync(cleanProjectDir, { recursive: true, force: true });

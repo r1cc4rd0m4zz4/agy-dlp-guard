@@ -1,6 +1,6 @@
 {
   "name": "agy-dlp-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-dependency DLP, Path Protection & Secret Redaction Hook & Plugin for Google Antigravity (AGY)",
   "type": "module",
   "bin": {
@@ -49,7 +49,6 @@
     "bin/agy-dlp.mjs",
     "hooks/dlp-guard.mjs",
     "hooks/dlp-session-start.mjs",
-    "hooks/hooks.json",
     "lib/bash-guard.mjs",
     "lib/config.mjs",
     "lib/path-guard.mjs",

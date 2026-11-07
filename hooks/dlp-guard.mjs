@@ -114,7 +114,21 @@ export function findPaths(args) {
 
 function extractReplacementTexts(args) {
   const chunks = [];
-  for (const k of ["Replacement", "replacement", "ReplacementContent", "replacementContent", "Content", "content"]) {
+  const REPLACEMENT_KEYS = [
+    "Replacement",
+    "replacement",
+    "ReplacementContent",
+    "replacementContent",
+    "Content",
+    "content",
+    "newString",
+    "new_string",
+    "newText",
+    "new_str",
+    "patchText",
+    "patch",
+  ];
+  for (const k of REPLACEMENT_KEYS) {
     if (typeof args[k] === "string" && args[k]) {
       chunks.push(args[k]);
     }
@@ -124,7 +138,16 @@ function extractReplacementTexts(args) {
     for (const c of chunkList) {
       if (c && typeof c === "object") {
         const text =
-          c.ReplacementContent || c.replacementContent || c.Replacement || c.replacement || c.newText || "";
+          c.newString ||
+          c.new_string ||
+          c.newText ||
+          c.new_str ||
+          c.replacement ||
+          c.Replacement ||
+          c.ReplacementContent ||
+          c.replacementContent ||
+          c.content ||
+          "";
         if (typeof text === "string" && text) chunks.push(text);
       }
     }

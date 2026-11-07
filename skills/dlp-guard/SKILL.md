@@ -17,12 +17,8 @@ Use this skill when the user wants to inspect, test, configure, or troubleshoot 
    - **Pre-Execution Secret Prevention (`lib/secret-scanner.mjs`)**: Scans outbound `write_file`, `edit_file`, `multi_replace_file_content`, `send_message`, `search_web`, and `mcp:*` payloads to block accidental secret leaks or exfiltration before execution.
    - **Shell Obfuscation & Destructive Command Guard (`lib/bash-guard.mjs`)**: Inspects `run_command` / `Bash` commands across pipes, subshells `( ... )`, brace groups `{ ...; }`, process substitutions `<(...)` / `>(...)`, ANSI-C `$'\x2e...'` strings, cross-segment variable assignments (`A=.e; B=nv; cat $A$B`), command substitutions `$(echo .env)`, parameter expansions `${x:-.env}`, `xargs` pipelines, `base64 -d | sh`, `dd`, `source`, `grep`/`rg`/`sed`/`awk`/`jq`/`find`/`git`/`tar`/`zip`/`openssl`/`curl`/`wget`, and inline `python`/`node`/`ruby`/`perl` scripts.
 
-2. **`PostToolUse` (`hooks/dlp-guard.mjs`)**:
-   - Scans tool output (`read_file`, `run_command`, `grep_search`, `view_file_outline`, `view_code_item`, `mcp:*`, etc.) using 30+ high-precision regex rules and optional `gitleaks` integration.
-   - If secrets are found in `read_file` / `grep_search` / `view_*` outputs, blocks the raw output and returns a sanitized `[REDACTED:...]` view via `reason` + `systemMessage` so raw credentials never enter model context.
-
-3. **`UserPromptSubmit` (`hooks/dlp-guard.mjs`)**:
-   - Scans user prompts before submission (default mode: `warn`, configurable to `block` in `dlp-guard.json`).
+2. **`SessionStart` (`hooks/dlp-session-start.mjs`)**:
+   - Injects a deterministic security status banner into the conversation context at startup, outlining active DLP protections and Gitleaks engine status.
 
 ## CLI Commands
 
@@ -36,13 +32,13 @@ node bin/agy-dlp.mjs status
 node bin/agy-dlp.mjs install --global
 
 # Install into project-level hooks (.agents/hooks.json)
-node bin/agy-dlp.mjs install --project
+node bin/agy-dlp.mjs install --workspace
 
 # Enable or disable DLP protection live (no restart required)
 node bin/agy-dlp.mjs toggle on
 node bin/agy-dlp.mjs toggle off
 
 # Scan a specific file or command for DLP violations
-node bin/agy-dlp.mjs scan-file path/to/file
-node bin/agy-dlp.mjs scan-cmd "cat .env"
+node bin/agy-dlp.mjs scan path/to/file
+node bin/agy-dlp.mjs scan "cat .env"
 ```

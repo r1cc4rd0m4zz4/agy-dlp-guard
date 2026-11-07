@@ -5,6 +5,7 @@ import {
   resetSessionState,
   hasGitleaks,
   scanWithGitleaks,
+  parseGitleaksMode,
 } from "../lib/secret-scanner.mjs";
 import { DEFAULT_CONFIG } from "../lib/config.mjs";
 
@@ -105,13 +106,41 @@ export async function runSecretScannerTests() {
     assert.equal(redactSecrets(b, DEFAULT_CONFIG), b);
   }
 
-  // 6. Gitleaks integration test
+  // 5b. Benign typed decisions, AST keys, and Laya model outputs
+  const kv = (k, v) => '"' + k + '": ' + (typeof v === "string" ? '"' + v + '"' : v);
+  const decisionCases = [
+    '{' + kv("k" + "ey", "incident_category") + ', "type": "choice", "choice": "customer_support"}',
+    '{' + kv("k" + "ey", "sentiment_analysis") + ', "score": 0.95, "confidence": 0.98}',
+    '{' + kv("decision_" + "key", "refund_evaluation") + ', "choice": "approve_refund"}',
+    '{' + kv("auth_" + "method", "single_sign_on") + ', ' + kv("auth_" + "type", "bearer_token") + ', ' + kv("auth_" + "status", "authenticated") + '}',
+    '{' + kv("tok" + "en_type", "classification_token") + ', ' + kv("tok" + "en", "classification") + ', "token_count": 128}',
+    '{' + kv("pass_" + "rate", "high_accuracy") + ', "pass_count": 42}',
+    '{' + kv("private_" + "method", "internal_evaluation") + ', "private_scope": "local"}',
+    '{"answers": {"department": {"choice": "billing_department"}}}',
+    '{"questions": {"urgency": {"type": "score", "instructions": "Rate urgency", "criteria": ["low", "high"]}}}',
+    '{"model": "convaiinnovations/laya-typed-decisions", "prediction": "security_incident"}',
+  ];
+
+  for (const d of decisionCases) {
+    const hit = detectSecrets(d, DEFAULT_CONFIG);
+    assert.equal(hit, null, "False positive detected on typed decision / AST key: " + d);
+    assert.equal(redactSecrets(d, DEFAULT_CONFIG), d);
+  }
+
+  // 6. parseGitleaksMode version parsing
+  assert.equal(parseGitleaksMode("8.30.1"), "stdin");
+  assert.equal(parseGitleaksMode("v8.19.0"), "stdin");
+  assert.equal(parseGitleaksMode("8.18.2"), "detect-pipe");
+  assert.equal(parseGitleaksMode("7.6.1"), false);
+  assert.equal(parseGitleaksMode("invalid"), false);
+
+  // 7. Gitleaks integration test
   if (hasGitleaks()) {
     const bigBuffer = "x".repeat(5000) + "\nexport NPM" + "_TOKEN=\"" + NPM_VAL + "\"\n";
     const leaks = scanWithGitleaks(bigBuffer, 1000);
     assert.ok(leaks.length > 0, "Gitleaks should find npm token in large buffer");
   }
 
-  console.log("  ok   secret scanner (all 6 assertion groups passed)");
+  console.log("  ok   secret scanner (all 7 assertion groups passed)");
   return true;
 }

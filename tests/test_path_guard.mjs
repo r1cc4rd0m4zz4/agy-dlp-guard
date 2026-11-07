@@ -51,7 +51,7 @@ export async function runPathGuardTests() {
       "~/.bash_profile",
       "~/.netrc",
       "~/.git-credentials",
-      "~/.pi/agent/auth.json",
+      "~/.docker/config.json",
     ]) {
       assert.ok(prot(p), `Expected sensitive path ${p} to be protected`);
     }

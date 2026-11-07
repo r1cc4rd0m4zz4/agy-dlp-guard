@@ -2,7 +2,7 @@
 
 **Zero-Trust Data Loss Prevention (DLP), Secret Redaction & Shell Hardening Plugin/Hook for Google Antigravity (`agy`).**
 
-Inspired by [`pi-dlp-guard`](https://github.com/r1cc4rd0m4zz4/pi-dlp-guard) and engineered specifically for the **Antigravity (`agy`)** lifecycle hook architecture (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `SessionStart`) and `agy plugin` specification.
+Inspired by [`pi-dlp-guard`](https://github.com/r1cc4rd0m4zz4/pi-dlp-guard) and engineered specifically for the **Antigravity (`agy`)** lifecycle hook architecture (`PreToolUse`, `SessionStart`) and `agy plugin` specification.
 
 ---
 
@@ -42,7 +42,7 @@ Prevents a compromised or jailbroken agent from disabling or tampering with DLP 
 - Blocks writes, edits, deletions, symlinks, permissions changes, or redirects to `~/.gemini/config/hooks.json`, `.agents/hooks.json`, `dlp-guard.json`, `plugin.json`, and the `agy-dlp-guard` installation directory.
 - Blocks self-disabling CLI execution (`agy-dlp toggle off`, `agy-dlp uninstall`) inside `run_command`.
 
-### 4. 🕵️ Dual-Engine Secret Scanner & Redaction (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`)
+### 4. 🕵️ Dual-Engine Secret Scanner & Redaction (`PreToolUse`)
 - **30+ High-Precision Built-in Regex Rules**:
   - AWS Access Keys (`AKIA...`, `ASIA...`) & AWS Secret Keys
   - GitHub Tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`)
@@ -51,10 +51,10 @@ Prevents a compromised or jailbroken agent from disabling or tampering with DLP 
   - Stripe (`sk_live_`, `rk_live_`), Twilio (`SK...`), SendGrid (`SG...`), DigitalOcean (`dop_v1_`, `doo_v1_`), npm (`npm_...`), PyPI (`pypi-...`), Age secret keys (`AGE-SECRET-KEY-1...`), HashiCorp Vault (`hvs.`), Databricks (`dapi...`), Telegram Bot Tokens, JWTs, `Authorization: Bearer` tokens
   - PEM Private Keys (`RSA`, `OPENSSH`, `EC`, `DSA`, `PGP`, `ENCRYPTED`)
   - Database Connection URIs with embedded credentials (`postgres://`, `mysql://`, `mongodb+srv://`, `redis://`, `amqp://`)
-  - Generic `API_KEY`, `SECRET_KEY`, `ACCESS_TOKEN`, `AUTH_TOKEN`, `PRIVATE_KEY`, `CLIENT_SECRET`, `PASSWORD`, `DB_PASS` assignments (with code-aware lookahead to avoid false positives on JS/TS expressions like `secretToToken.get(secret)`).
-- **Optional Gitleaks Integration**: Automatically invokes `gitleaks detect --no-git` when installed on `PATH` for 150+ additional vendor rules.
+  - Sensitive credential variable patterns (`password`, `secret`, `credential`, `api_key`, `token`, etc.) with code-aware lookahead and benign AST/decision key immunity (ignoring non-secret suffixes like `_type`, `_count`, `_method`, `_choice`, `_score`).
+- **Optional Gitleaks Integration**: Automatically invokes `gitleaks detect --pipe` or `gitleaks stdin` when installed on `PATH` for 150+ additional vendor rules.
 - **Outbound Leak & Exfiltration Prevention (`PreToolUse`)**: Blocks `write_file`, `edit_file`, `multi_replace_file_content`, `send_message`, `search_web`, and `mcp:*` calls if they attempt to write or exfiltrate hardcoded secrets.
-- **Inbound Output Redaction (`PostToolUse`)**: Intercepts `read_file`, `grep_search`, `view_file_outline`, `view_code_item`, `run_command`, and `mcp:*` outputs containing secrets, blocking raw credential exposure and providing a deterministic `[REDACTED:RULE_ID:xxxx...xxxx]` view.
+- **Relational In-Memory Redactor**: Deterministic session-consistent secret redaction (`[REDACTED_CATEGORY_#1]`) across repeated occurrences.
 
 ---
 
@@ -133,12 +133,12 @@ node bin/agy-dlp.mjs toggle on
 node bin/agy-dlp.mjs toggle off
 
 # Test a file path + content against DLP rules
-node bin/agy-dlp.mjs scan-file .env
-node bin/agy-dlp.mjs scan-file src/config.js
+node bin/agy-dlp.mjs scan .env
+node bin/agy-dlp.mjs scan src/config.js
 
 # Test a shell command against the Bash Guard & Secret Scanner
-node bin/agy-dlp.mjs scan-cmd "rm -rf .env"
-node bin/agy-dlp.mjs scan-cmd "A=.e; B=nv; cat \$A\$B"
+node bin/agy-dlp.mjs scan "rm -rf .env"
+node bin/agy-dlp.mjs scan "A=.e; B=nv; cat \$A\$B"
 
 # Run the security regression suite
 node bin/agy-dlp.mjs test
@@ -153,27 +153,37 @@ Create `.agents/dlp-guard.json` (project) or `~/.gemini/config/dlp-guard.json` (
 ```json
 {
   "enabled": true,
-  "mode": "enforce",
-  "userPromptAction": "warn",
-  "blockWriteSecrets": true,
-  "redactToolOutput": true,
-  "blockReadToolOutputOnSecret": true,
   "protectedPaths": [
-    "**/.env",
-    "**/.env.*",
+    ".env",
+    ".env.*",
+    "*.env",
+    ".envrc",
+    "~/.ssh/**",
+    "~/.aws/**",
+    "~/.config/gcloud/**",
+    "~/.azure/**",
+    "~/.kube/**",
+    "~/.docker/config.json",
+    "**/*.tfstate*",
+    "**/*.tfvars",
     "**/*.pem",
     "**/*.key"
   ],
-  "allowedPaths": [
-    "**/.env.example",
-    "**/.env.sample",
-    "**/.env.template"
+  "integrityPaths": [
+    "~/.gemini/config/**",
+    "~/.gemini/antigravity-cli/**",
+    "~/.gemini/antigravity/**",
+    "~/.gemini/antigravity-ide/**",
+    ".agents/**",
+    ".agent/**",
+    "_agents/**",
+    "_agent/**"
   ],
-  "gitleaks": {
-    "enabled": true,
-    "binaryPath": "gitleaks",
-    "timeoutMs": 5000
-  }
+  "enableGitleaks": true,
+  "gitleaksMinBytes": 4096,
+  "gitleaksTimeoutMs": 2000,
+  "blockInlineSecretsInCommands": true,
+  "blockReaderCommandsOnProtected": true
 }
 ```
 
