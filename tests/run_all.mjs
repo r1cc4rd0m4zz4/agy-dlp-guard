@@ -7,12 +7,14 @@ import { runPathGuardTests } from "./test_path_guard.mjs";
 import { runBashGuardTests } from "./test_bash_guard.mjs";
 import { runSecretScannerTests } from "./test_secret_scanner.mjs";
 import { runHookProtocolTests } from "./test_hooks.mjs";
+import { runCliStatusTests } from "./test_cli_status.mjs";
 
 const SUITES = [
   { name: "Path & Traversal Guard", fn: runPathGuardTests },
   { name: "Bash Command & Obfuscation Guard", fn: runBashGuardTests },
   { name: "Secret Scanner & Redaction Engine", fn: runSecretScannerTests },
   { name: "Antigravity Hook Lifecycle & Protocol", fn: runHookProtocolTests },
+  { name: "CLI Status & Plugin Engine Detection", fn: runCliStatusTests },
 ];
 
 let failed = 0;
@@ -36,6 +38,6 @@ if (failed > 0) {
   console.error(`❌ ${failed} test suite(s) failed.`);
   process.exit(1);
 } else {
-  console.log("✅ All 4 security test suites passed with 0 errors!");
+  console.log("✅ All 5 security test suites passed with 0 errors!");
   process.exit(0);
 }

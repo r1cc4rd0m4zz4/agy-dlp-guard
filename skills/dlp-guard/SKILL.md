@@ -5,40 +5,46 @@ description: Configure, inspect, test, and troubleshoot Antigravity DLP Guard (a
 
 # Antigravity DLP Guard (`agy-dlp-guard`)
 
-Use this skill when the user wants to inspect, test, configure, or troubleshoot Data Loss Prevention (DLP) hooks and rules in Antigravity (`agy`).
+Use this skill when inspecting, testing, configuring, or troubleshooting Data Loss Prevention (DLP) hooks and rules in Antigravity (`agy`).
 
 ## Architecture Overview
 
 `agy-dlp-guard` enforces deterministic, zero-trust security boundaries using Antigravity's native lifecycle hooks:
 
 1. **`PreToolUse` (`hooks/dlp-guard.mjs`)**:
-   - **Integrity & Anti-Tampering Guard**: Blocks write, edit, delete, chmod, or redirect attempts targeting `~/.gemini/config/hooks.json`, `.agents/hooks.json`, `dlp-guard.json`, `plugin.json`, or the `agy-dlp-guard` directory itself, as well as self-disabling CLI invocations (`agy-dlp toggle off`, `agy-dlp uninstall`).
-   - **Protected Path Guard (`lib/path-guard.mjs`)**: Blocks reading, writing, editing, or deleting sensitive files (`.env*` except safe templates, SSH/GPG/Age keys, AWS/GCP/Azure/K8s/Terraform/Vault/1Password credentials, `/etc/shadow*`, `/etc/sudoers*`, `.netrc`, `.npmrc`, `.pypirc`) with `fs.realpathSync` symlink resolution, single & double URL decoding, tilde/`$HOME`/`$PWD` expansion, recursive brace expansion (`.{env,bak}`), and shell glob expansion (`.en?`, `.e*`, `[.]env`).
+   - **Integrity & Anti-Tampering Guard**: Blocks write, edit, delete, chmod, or redirect attempts targeting `~/.gemini/config/hooks.json`, `.agents/hooks.json`, `dlp-guard.json`, `plugin.json`, or the `agy-dlp-guard` directory itself, as well as self-disabling CLI invocations (`agy plugin disable agy-dlp-guard`, `agy-dlp toggle off`, `agy-dlp uninstall`).
+   - **Protected Path Guard (`lib/path-guard.mjs`)**: Blocks reading, writing, editing, or deleting sensitive files (`.env*` except safe templates, SSH/GPG/Age keys, AWS/GCP/Azure/K8s/Terraform/Vault/1Password credentials, `/etc/shadow*`, `/etc/sudoers*`, `.netrc`, `.npmrc`, `.pypirc`) with realpath symlink resolution, single & double URL decoding, tilde/`$HOME`/`$PWD` expansion, recursive brace expansion, and shell glob expansion.
    - **Pre-Execution Secret Prevention (`lib/secret-scanner.mjs`)**: Scans outbound `write_file`, `edit_file`, `multi_replace_file_content`, `send_message`, `search_web`, and `mcp:*` payloads to block accidental secret leaks or exfiltration before execution.
-   - **Shell Obfuscation & Destructive Command Guard (`lib/bash-guard.mjs`)**: Inspects `run_command` / `Bash` commands across pipes, subshells `( ... )`, brace groups `{ ...; }`, process substitutions `<(...)` / `>(...)`, ANSI-C `$'\x2e...'` strings, cross-segment variable assignments (`A=.e; B=nv; cat $A$B`), command substitutions `$(echo .env)`, parameter expansions `${x:-.env}`, `xargs` pipelines, `base64 -d | sh`, `dd`, `source`, `grep`/`rg`/`sed`/`awk`/`jq`/`find`/`git`/`tar`/`zip`/`openssl`/`curl`/`wget`, and inline `python`/`node`/`ruby`/`perl` scripts.
+   - **Shell Obfuscation & Destructive Command Guard (`lib/bash-guard.mjs`)**: Inspects `run_command` commands across pipes, subshells, brace groups, process substitutions, ANSI-C strings, cross-segment variable assignments, command substitutions, parameter expansions, `xargs` pipelines, encoded payload execution (`base64 -d | sh`), and inline script invocations.
 
 2. **`SessionStart` (`hooks/dlp-session-start.mjs`)**:
-   - Injects a deterministic security status banner into the conversation context at startup, outlining active DLP protections and Gitleaks engine status.
+   - Injects a deterministic security status banner into conversation context at startup outlining active protections and Gitleaks engine status.
 
-## CLI Commands
+## Official Installation & Management
 
-Run `agy-dlp` (or `node bin/agy-dlp.mjs`) to manage the hook:
+Install via Antigravity plugin manager:
 
 ```bash
-# Check installation and protection status
+# Official installation (mounts hooks, rules, and skill automatically)
+agy plugin install https://github.com/r1cc4rd0m4zz4/agy-dlp-guard
+
+# Check status
+agy plugin list
 node bin/agy-dlp.mjs status
 
-# Install into global Antigravity hooks (~/.gemini/config/hooks.json)
-node bin/agy-dlp.mjs install --global
+# Enable / Disable
+agy plugin enable agy-dlp-guard
+agy plugin disable agy-dlp-guard
+```
 
-# Install into project-level hooks (.agents/hooks.json)
-node bin/agy-dlp.mjs install --workspace
+## Diagnostics CLI (`agy-dlp`)
 
-# Enable or disable DLP protection live (no restart required)
-node bin/agy-dlp.mjs toggle on
-node bin/agy-dlp.mjs toggle off
+Run `node bin/agy-dlp.mjs` to run live tests or diagnostic checks:
 
-# Scan a specific file or command for DLP violations
-node bin/agy-dlp.mjs scan path/to/file
-node bin/agy-dlp.mjs scan "cat .env"
+```bash
+# Check status and loaded rules
+node bin/agy-dlp.mjs status
+
+# Run security test suite
+node bin/agy-dlp.mjs test
 ```

@@ -2,14 +2,21 @@
 
 **Zero-Trust Data Loss Prevention (DLP), Secret Redaction & Shell Hardening Plugin/Hook for Google Antigravity (`agy`).**
 
-Inspired by [`pi-dlp-guard`](https://github.com/r1cc4rd0m4zz4/pi-dlp-guard) and engineered specifically for the **Antigravity (`agy`)** lifecycle hook architecture (`PreToolUse`, `SessionStart`) and `agy plugin` specification.
+Inspired by [`pi-dlp-guard`](https://github.com/r1cc4rd0m4zz4/pi-dlp-guard) and engineered specifically for the **Antigravity (`agy`)** lifecycle hook architecture (`PreToolUse`, `SessionStart`) and native `agy plugin` specification.
+
+---
+
+> [!IMPORTANT]
+> **Skill vs Full Security Plugin (`skills.sh` vs `agy plugin install`)**:
+> - Se installi questo repository tramite il gestore di prompt skills (`pnpx skills add https://github.com/r1cc4rd0m4zz4/agy-dlp-guard`), viene copiata **solamente la Skill prompt** (`skills/dlp-guard/SKILL.md`) che fornisce all'agente le nozioni di DLP. **Non vengono installati né attivati gli hook di ciclo di vita a basso livello**.
+> - Per attivare l'**enforcement deterministico** (il blocco a basso livello dei comandi shell, la prevenzione dei leak nei tool e la protezione dei percorsi riservati), devi installare `agy-dlp-guard` tramite la procedura standard ufficiale: `agy plugin install`.
 
 ---
 
 ## ✨ Key Security Capabilities
 
 ### 1. 🔒 Protected Path & Symlink Traversal Guard (`PreToolUse`)
-Blocks read, write, edit, copy, move, or delete operations targeting sensitive files across **all** Antigravity tools (`read_file`, `write_file`, `edit_file`, `multi_replace_file_content`, `grep_search`, `list_dir`, `find_by_name`, `run_command`, and `mcp:*`):
+Blocks read, write, edit, copy, move, or delete operations targeting sensitive files across **all** Antigravity tools (`read_file`, `write_file`, `edit_file`, `multi_replace_file_content`, `run_command`, etc.):
 - **Environment Secrets**: `.env`, `.env.local`, `.env.production`, `.env.staging`, `.env.development.*`, `.envrc` *(while safely permitting genuine non-symlinked `.env.example`, `.env.sample`, `.env.template`, `.env.dist`, `.env.schema` outside integrity paths)*.
 - **Cryptographic Keys & Certificates**: `~/.ssh/**`, `id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.asc`, `*.gpg`, `*.age`, `~/.gnupg/**`.
 - **Cloud, Infra & Package Credentials**: `~/.aws/**`, `~/.config/gcloud/**`, `~/.azure/**`, `~/.kube/**`, `~/.docker/config.json`, `~/.config/gh/**`, `~/.vault-token`, `~/.password-store/**`, `~/.config/op/**`, `*.tfstate*`, `*.tfvars`, `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`.
@@ -24,174 +31,91 @@ Blocks read, write, edit, copy, move, or delete operations targeting sensitive f
 
 ### 2. 🐚 Deep Shell & Obfuscation Guard (`PreToolUse` on `run_command`)
 Parses and inspects complex shell commands before execution:
-- **Subshell & Grouping Unwrapping**: Recursively unwraps `(rm .env)`, `{ rm .env; }`, `>(tee .env)`, `<(cat .env)`, and command substitutions `$(...)` / `` `...` ``.
-- **Destructive Target Resolution**: Blocks `rm`, `unlink`, `shred`, `wipe`, `srm`, `mv`, `cp`, `ln`, `install`, `rsync`, `truncate`, `dd of=...`, `find ... -delete`, `chmod`, `chown`, `chattr`, `tee`, and shell redirects (`>`, `>>`, `>|`, `&>`, `>&`, `<>`) targeting protected or integrity paths.
+- **Subshell & Grouping Unwrapping**: Recursively unwraps subshells, command substitutions, and grouped blocks.
+- **Destructive Target Resolution**: Blocks destructive tools (`rm`, `unlink`, `shred`, `mv`, `cp`, `ln`, `truncate`, `dd`, `chmod`, `chown`, redirects) targeting protected or integrity paths.
 - **Anti-Obfuscation Engine**:
-  - ANSI-C quoting decoding (`$'\x2e\x65\x6e\x76'` → `.env`, octal `$'\056env'`)
-  - Cross-segment variable assignment tracking (`A=.e; B=nv; cat $A$B` and `CMD=cat; F=.env; $CMD $F`)
-  - Command substitution & parameter expansion normalization (`rm $(echo .env)`, `cat $(printf '%s' .env)`, `.${empty}env`, `${unset:-.env}`)
-  - Pipe-to-`xargs` tracking (`echo .env | xargs cat`)
-  - Encoded payload execution blocking (`base64 -d | sh`, `xxd -r | bash`, `eval $(...)`)
-  - Inline script inspection (`python3 -c "open('.env')..."`, `node -e "fs.readFileSync('.env')"`, `ruby -e`, `perl -e`)
+  - ANSI-C quoting decoding (`$'\x2e...'`)
+  - Cross-segment variable assignment tracking (`A=.e; B=nv; cat $A$B`)
+  - Parameter expansion normalization
+  - Pipe-to-`xargs` tracking
+  - Encoded payload execution blocking (`base64 -d | sh`, `xxd -r | bash`, `eval`)
+  - Inline script inspection (`python3 -c`, `node -e`, `ruby -e`, `perl -e`)
 - **Tool-Aware Argument Inspection**:
-  - Distinguishes search pattern from file path in `grep`, `rg`, `ag`, `ack` (`grep SECRET src/app.js` is allowed; `grep foo .env` is blocked).
-  - Inspects `dd if=.env`, `source .env`, `. .env`, `sed`/`awk`/`jq`/`yq`, `git diff --no-index /dev/null .env`, `git show HEAD:.env`, `tar`/`zip`/`7z`, `openssl`, `scp`/`sftp`, `curl -d @.env -o .env`, `wget -O .env`.
+  - Distinguishes search patterns from file paths (`grep`, `rg`, `ag`).
+  - Inspects `dd`, `source`, `git`, `tar`, `zip`, `openssl`, `curl`, `wget`.
 
 ### 3. 🛡️ Self-Protection & Integrity Guard (`PreToolUse`)
 Prevents a compromised or jailbroken agent from disabling or tampering with DLP enforcement:
 - Blocks writes, edits, deletions, symlinks, permissions changes, or redirects to `~/.gemini/config/hooks.json`, `.agents/hooks.json`, `dlp-guard.json`, `plugin.json`, and the `agy-dlp-guard` installation directory.
-- Blocks self-disabling CLI execution (`agy-dlp toggle off`, `agy-dlp uninstall`) inside `run_command`.
+- Blocks self-disabling CLI execution (`agy-dlp toggle off`, `agy-dlp uninstall`, `agy plugin disable agy-dlp-guard`) inside `run_command`.
 
 ### 4. 🕵️ Dual-Engine Secret Scanner & Redaction (`PreToolUse`)
 - **30+ High-Precision Built-in Regex Rules**:
-  - AWS Access Keys (`AKIA...`, `ASIA...`) & AWS Secret Keys
-  - GitHub Tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`)
-  - GitLab PATs (`glpat-`), Slack Tokens (`xoxb-`, `xoxp-`, etc.) & Webhooks
-  - Google API Keys (`AIza...`), OpenAI (`sk-proj-...`) & Anthropic (`sk-ant-...`) Keys
-  - Stripe (`sk_live_`, `rk_live_`), Twilio (`SK...`), SendGrid (`SG...`), DigitalOcean (`dop_v1_`, `doo_v1_`), npm (`npm_...`), PyPI (`pypi-...`), Age secret keys (`AGE-SECRET-KEY-1...`), HashiCorp Vault (`hvs.`), Databricks (`dapi...`), Telegram Bot Tokens, JWTs, `Authorization: Bearer` tokens
-  - PEM Private Keys (`RSA`, `OPENSSH`, `EC`, `DSA`, `PGP`, `ENCRYPTED`)
-  - Database Connection URIs with embedded credentials (`postgres://`, `mysql://`, `mongodb+srv://`, `redis://`, `amqp://`)
-  - Sensitive credential variable patterns (`password`, `secret`, `credential`, `api_key`, `token`, etc.) with code-aware lookahead and benign AST/decision key immunity (ignoring non-secret suffixes like `_type`, `_count`, `_method`, `_choice`, `_score`).
-- **Optional Gitleaks Integration**: Automatically invokes `gitleaks detect --pipe` or `gitleaks stdin` when installed on `PATH` for 150+ additional vendor rules.
-- **Outbound Leak & Exfiltration Prevention (`PreToolUse`)**: Blocks `write_file`, `edit_file`, `multi_replace_file_content`, `send_message`, `search_web`, and `mcp:*` calls if they attempt to write or exfiltrate hardcoded secrets.
-- **Relational In-Memory Redactor**: Deterministic session-consistent secret redaction (`[REDACTED_CATEGORY_#1]`) across repeated occurrences.
+  - AWS Access Keys & Secret Keys
+  - GitHub Tokens, GitLab PATs, Slack Tokens & Webhooks
+  - Google API Keys, OpenAI & Anthropic Keys
+  - Stripe, Twilio, SendGrid, DigitalOcean, npm, PyPI, Age keys, Vault, Databricks, Telegram, JWTs, Bearer tokens
+  - PEM Private Keys
+  - Database Connection URIs with embedded credentials
+  - Sensitive credential variable patterns with code-aware lookahead and AST benign key immunity.
+- **Optional Gitleaks Integration**: Automatically invokes `gitleaks` when installed on `PATH` for 150+ additional vendor rules.
+- **Outbound Leak & Exfiltration Prevention (`PreToolUse`)**: Blocks `write_file`, `edit_file`, `multi_replace_file_content`, `send_message`, `search_web`, and `mcp:*` calls attempting to write or exfiltrate hardcoded secrets.
 
 ---
 
-## 🚀 Installation
+## 🚀 Installazione Ufficiale
 
-### Option A: Install via Antigravity CLI directly from GitHub (Recommended)
-
-You can install `agy-dlp-guard` directly into Antigravity (`agy`) straight from the GitHub repository URL in one command:
+Installazione diretta in Antigravity (`agy`) in un solo comando tramite il plugin manager ufficiale:
 
 ```bash
-# Install plugin directly from GitHub into ~/.gemini/config/plugins/
 agy plugin install https://github.com/r1cc4rd0m4zz4/agy-dlp-guard
 ```
 
-Antigravity will automatically clone the repository, register the plugin manifest (`plugin.json`), mount the DLP lifecycle hooks (`PreToolUse`, `SessionStart`), and activate the bundled `dlp-guard` skill and `rules/AGENTS.md`.
+Antigravity clona automaticamente il repository in `~/.gemini/config/plugins/agy-dlp-guard`, registra il manifest (`plugin.json`), aggancia gli hook di ciclo di vita (`hooks.json`), e attiva la regola `rules/AGENTS.md` e la skill `dlp-guard`.
 
-Manage the plugin at any time:
+### Gestione del Plugin
+
 ```bash
-# Check status and components
+# Verifica lo stato e i componenti attivi
 agy plugin list
 
-# Temporarily disable / re-enable
+# Disabilita temporaneamente / Riabilita
 agy plugin disable agy-dlp-guard
 agy plugin enable agy-dlp-guard
 
-# Uninstall
+# Disinstalla
 agy plugin uninstall agy-dlp-guard
 ```
 
 ---
 
-### Option B: Install as a Standalone Hook via CLI (`agy-dlp`)
+## 🛠️ CLI di Diagnostica e Test (`agy-dlp`)
 
-If you prefer to clone the repository manually or install it into a specific workspace without using `agy plugin install`:
-
-```bash
-git clone https://github.com/r1cc4rd0m4zz4/agy-dlp-guard.git
-cd agy-dlp-guard
-
-# Install globally into ~/.gemini/config/hooks.json
-node bin/agy-dlp.mjs install --global
-
-# Or install per-workspace into .agents/hooks.json
-node bin/agy-dlp.mjs install --workspace
-```
-
----
-
-### Option C: Manual Workspace / Global Plugin Directory
-
-You can also clone the repository directly into any standard Antigravity plugin directory:
+All'interno dell'installazione è disponibile il comando di diagnostica:
 
 ```bash
-# Global plugin (~/.gemini/config/plugins/)
-git clone https://github.com/r1cc4rd0m4zz4/agy-dlp-guard.git ~/.gemini/config/plugins/agy-dlp-guard
-
-# Workspace-specific plugin (.agents/plugins/)
-git clone https://github.com/r1cc4rd0m4zz4/agy-dlp-guard.git .agents/plugins/agy-dlp-guard
-```
-
-Verify compliance at any time:
-```bash
-agy plugin validate . --strict
-```
-
----
-
-## 🛠️ CLI Reference (`agy-dlp`)
-
-```bash
-# Display current installation, Gitleaks detection, and protected path rules
+# Mostra lo stato di DLP Guard, la configurazione attiva e il rilevamento del Plugin Engine
 node bin/agy-dlp.mjs status
 
-# Enable or disable DLP enforcement live (no restart needed)
-node bin/agy-dlp.mjs toggle on
-node bin/agy-dlp.mjs toggle off
+# Esegui un test diagnostico su percorso o comando per verificare se viene bloccato
+node bin/agy-dlp.mjs scan path/to/target
+node bin/agy-dlp.mjs scan "git status"
 
-# Test a file path + content against DLP rules
-node bin/agy-dlp.mjs scan .env
-node bin/agy-dlp.mjs scan src/config.js
-
-# Test a shell command against the Bash Guard & Secret Scanner
-node bin/agy-dlp.mjs scan "rm -rf .env"
-node bin/agy-dlp.mjs scan "A=.e; B=nv; cat \$A\$B"
-
-# Run the security regression suite
+# Esegui la suite di test di sicurezza
 node bin/agy-dlp.mjs test
 ```
 
 ---
 
-## ⚙️ Configuration (`dlp-guard.json`)
+## ⚙️ Configurazione Personalizzata (`dlp-guard.json`)
 
-Create `.agents/dlp-guard.json` (project) or `~/.gemini/config/dlp-guard.json` (global) to customize behavior. See [`dlp-guard.json.example`](./dlp-guard.json.example):
-
-```json
-{
-  "enabled": true,
-  "protectedPaths": [
-    ".env",
-    ".env.*",
-    "*.env",
-    ".envrc",
-    "~/.ssh/**",
-    "~/.aws/**",
-    "~/.config/gcloud/**",
-    "~/.azure/**",
-    "~/.kube/**",
-    "~/.docker/config.json",
-    "**/*.tfstate*",
-    "**/*.tfvars",
-    "**/*.pem",
-    "**/*.key"
-  ],
-  "integrityPaths": [
-    "~/.gemini/config/**",
-    "~/.gemini/antigravity-cli/**",
-    "~/.gemini/antigravity/**",
-    "~/.gemini/antigravity-ide/**",
-    ".agents/**",
-    ".agent/**",
-    "_agents/**",
-    "_agent/**"
-  ],
-  "enableGitleaks": true,
-  "gitleaksMinBytes": 4096,
-  "gitleaksTimeoutMs": 2000,
-  "blockInlineSecretsInCommands": true,
-  "blockReaderCommandsOnProtected": true
-}
-```
+Per personalizzare le liste di percorsi o abilitare/disabilitare funzionalità specifiche, crea `.agents/dlp-guard.json` (nel progetto) o `~/.gemini/config/dlp-guard.json` (globale). Vedi [`dlp-guard.json.example`](./dlp-guard.json.example).
 
 ---
 
-## 🧪 Running Tests
+## 🧪 Esecuzione dei Test
 
-`agy-dlp-guard` ships with a zero-dependency adversarial security regression suite covering 130+ test vectors across path traversal, symlink attacks, shell obfuscation, secret detection, false-positive immunity, and hook lifecycle protocols:
+`agy-dlp-guard` include una suite completa di test di sicurezza a zero dipendenze esterne:
 
 ```bash
 npm test

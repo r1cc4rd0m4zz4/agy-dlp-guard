@@ -39,6 +39,10 @@ function getDlpConfigPath(isWorkspace) {
   return path.join(getHome(), ".gemini", "config", "dlp-guard.json");
 }
 
+function getAgyConfigJsonPath() {
+  return path.join(getHome(), ".gemini", "config", "config.json");
+}
+
 function showHelp() {
   console.log(`
 agy-dlp-guard 🛡️  Antigravity DLP Guard Management CLI
@@ -66,20 +70,45 @@ function cmdStatus(isWorkspace) {
   const hooksFile = getHooksJsonPath(isWorkspace);
   const cfg = loadConfig(process.cwd());
 
-  let registered = false;
-  let hookEnabled = false;
+  let registeredStatus = "NO";
+  let hookActive = false;
 
-  if (fs.existsSync(hooksFile)) {
+  // 1. Check Antigravity native plugin registration (config.json)
+  const agyConfigFile = getAgyConfigJsonPath();
+  if (fs.existsSync(agyConfigFile)) {
     try {
-      const hooksData = JSON.parse(fs.readFileSync(hooksFile, "utf-8"));
-      if (hooksData["dlp-guard"]) {
-        registered = true;
-        hookEnabled = hooksData["dlp-guard"].enabled !== false;
+      const agyConfig = JSON.parse(fs.readFileSync(agyConfigFile, "utf-8"));
+      if (agyConfig.plugins && agyConfig.plugins["agy-dlp-guard"] !== undefined) {
+        const isPluginEnabled = agyConfig.plugins["agy-dlp-guard"].enabled !== false;
+        if (isPluginEnabled) {
+          registeredStatus = "YES (via Antigravity Plugin Engine)";
+          hookActive = true;
+        } else {
+          registeredStatus = "DISABLED (via Antigravity Plugin Engine)";
+          hookActive = false;
+        }
       }
     } catch {}
   }
 
-  const effectivelyActive = cfg.enabled && (!registered || hookEnabled);
+  // 2. Check standalone / fallback hooks.json if not already found in plugin engine
+  if (registeredStatus === "NO" && fs.existsSync(hooksFile)) {
+    try {
+      const hooksData = JSON.parse(fs.readFileSync(hooksFile, "utf-8"));
+      if (hooksData["dlp-guard"]) {
+        const isHookEnabled = hooksData["dlp-guard"].enabled !== false;
+        if (isHookEnabled) {
+          registeredStatus = "YES (via hooks.json)";
+          hookActive = true;
+        } else {
+          registeredStatus = "DISABLED (via hooks.json)";
+          hookActive = false;
+        }
+      }
+    } catch {}
+  }
+
+  const effectivelyActive = cfg.enabled && (registeredStatus === "NO" || hookActive);
 
   console.log("==================================================");
   console.log("🛡️  Antigravity DLP Guard (agy-dlp-guard) Status");
@@ -87,7 +116,7 @@ function cmdStatus(isWorkspace) {
   console.log(`Guard State:         ${effectivelyActive ? "ACTIVE (Attivo)" : "DISABLED (Disattivato)"}`);
   console.log(`Config Source:       ${cfg.loadedFrom || "Default built-in values"}`);
   console.log(`Hooks Target:        ${hooksFile}`);
-  console.log(`Registered in hooks: ${registered ? (hookEnabled ? "YES (Attivo)" : "YES (Disabilitato)") : "NO"}`);
+  console.log(`Registered in hooks: ${registeredStatus}`);
   console.log(`Protected Paths:     ${cfg.protectedPaths.length} patterns`);
   console.log(`Integrity Paths:     ${cfg.integrityPaths.length} patterns`);
   console.log(
